@@ -187,7 +187,8 @@ async def generate_questions(request: GenerateQuestionsRequest):
             content=content_text or "",
             lang=inputs.lang or "zh-tw",
             max_questions=5,
-            previous_questions=inputs.previous_questions or []
+            previous_questions=inputs.previous_questions or [],
+            custom_prompt=inputs.prompt
         )
         
         # Build response matching existing format

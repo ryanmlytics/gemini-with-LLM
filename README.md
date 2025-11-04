@@ -79,21 +79,64 @@ curl http://localhost:8888/health
 ```
 
 **Test Endpoints:**
+
+**1. Generate Questions (from URL):**
 ```bash
-# Generate Questions
 curl -X POST http://localhost:8888/generateQuestions \
   -H "Content-Type: application/json" \
-  -d '{"inputs": {"url": "https://example.com/article", "lang": "zh-tw"}, "user": "test_user"}'
+  -d '{"inputs": {"url": "https://ai.mlyticsaigc.com/", "lang": "zh-tw"}, "user": "test_user", "type": "answer_page"}'
+```
 
-# Get Metadata
+**2. Generate Questions (from context text):**
+```bash
+curl -X POST http://localhost:8888/generateQuestions \
+  -H "Content-Type: application/json" \
+  -d '{"inputs": {"context": "This is a sample article about artificial intelligence and machine learning.", "lang": "en"}, "user": "test_user"}'
+```
+
+**3. Get Metadata:**
+```bash
 curl -X POST http://localhost:8888/getMetadata \
   -H "Content-Type: application/json" \
-  -d '{"inputs": {"url": "https://example.com/article"}, "user": "test_user"}'
+  -d '{"inputs": {"url": "https://ai.mlyticsaigc.com/", "query": "What is this article about?", "tag_prompt": "Generate 5 tags"}, "user": "test_user"}'
+```
 
-# Get Answer
+**4. Get Answer (non-streaming):**
+```bash
 curl -X POST http://localhost:8888/getAnswer \
   -H "Content-Type: application/json" \
-  -d '{"inputs": {"query": "What is this about?", "url": "https://example.com/article", "lang": "zh-tw"}, "user": "test_user", "stream": false}'
+  -d '{"inputs": {"query": "What is this article about?", "url": "https://ai.mlyticsaigc.com/", "lang": "zh-tw"}, "user": "test_user", "stream": false}'
+```
+
+**5. Get Answer (streaming - SSE):**
+```bash
+curl -X POST http://localhost:8888/getAnswer \
+  -H "Content-Type: application/json" \
+  -N -H "Accept: text/event-stream" \
+  -d '{"inputs": {"query": "What is this article about?", "url": "https://ai.mlyticsaigc.com/", "lang": "zh-tw"}, "user": "test_user", "stream": true}'
+```
+
+**Windows PowerShell (single-line versions):**
+```powershell
+# Health check
+curl http://localhost:8888/health
+
+# Generate Questions
+curl -X POST http://localhost:8888/generateQuestions -H "Content-Type: application/json" -d "{\"inputs\": {\"url\": \"https://ai.mlyticsaigc.com/\", \"lang\": \"zh-tw\"}, \"user\": \"test_user\"}"
+
+# Get Metadata
+curl -X POST http://localhost:8888/getMetadata -H "Content-Type: application/json" -d "{\"inputs\": {\"url\": \"https://ai.mlyticsaigc.com/\"}, \"user\": \"test_user\"}"
+
+# Get Answer
+curl -X POST http://localhost:8888/getAnswer -H "Content-Type: application/json" -d "{\"inputs\": {\"query\": \"What is this article about?\", \"url\": \"https://ai.mlyticsaigc.com/\", \"lang\": \"zh-tw\"}, \"user\": \"test_user\", \"stream\": false}"
+```
+
+**For production server (replace with your URL):**
+```bash
+# Replace https://your-api-server.com with your actual server URL
+curl -X POST https://your-api-server.com/generateQuestions \
+  -H "Content-Type: application/json" \
+  -d '{"inputs": {"url": "https://example.com/article", "lang": "zh-tw"}, "user": "test_user"}'
 ```
 
 ## Configuration
@@ -521,71 +564,18 @@ The test script will:
 
 ### Manual Testing with curl
 
-**Health Check:**
-```bash
-curl http://localhost:8888/health
-```
+See the [Quick Start - Test the Server](#4-test-the-server) section above for comprehensive curl examples.
 
-Expected response:
-```json
-{"status": "healthy", "timestamp": "2025-01-29T..."}
-```
+**Quick Reference:**
 
-**Generate Questions:**
-```bash
-curl -X POST http://localhost:8888/generateQuestions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inputs": {
-      "url": "https://example.com/article",
-      "lang": "zh-tw"
-    },
-    "user": "test_user"
-  }'
-```
+All endpoints are documented with curl examples in the [Quick Start - Test the Server](#4-test-the-server) section above. Here's a quick summary:
 
-**Get Metadata:**
-```bash
-curl -X POST http://localhost:8888/getMetadata \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inputs": {
-      "url": "https://example.com/article",
-      "query": "test query"
-    },
-    "user": "test_user"
-  }'
-```
+- **Health Check:** `curl http://localhost:8888/health`
+- **Generate Questions:** See example #1 and #2 above (from URL or context)
+- **Get Metadata:** See example #3 above  
+- **Get Answer:** See example #4 (non-streaming) and #5 (streaming) above
 
-**Get Answer (Non-Streaming):**
-```bash
-curl -X POST http://localhost:8888/getAnswer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inputs": {
-      "query": "What is this article about?",
-      "url": "https://example.com/article",
-      "lang": "zh-tw"
-    },
-    "user": "test_user",
-    "stream": false
-  }'
-```
-
-**Get Answer (Streaming - SSE):**
-```bash
-curl -X POST http://localhost:8888/getAnswer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inputs": {
-      "query": "What is this article about?",
-      "url": "https://example.com/article",
-      "lang": "zh-tw"
-    },
-    "user": "test_user",
-    "stream": true
-  }'
-```
+For detailed examples with real URLs and PowerShell commands, see the Quick Start section above.
 
 ### Testing with Python requests
 
