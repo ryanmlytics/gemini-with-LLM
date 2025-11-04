@@ -128,13 +128,6 @@ async def generate_questions(request: GenerateQuestionsRequest):
 
     start_time = time.time()
 
-    print("========================Generating Questions=========================")
-    print(request)
-    print("========================Received Request=========================")
-
-    print(request.inputs)
-    print("========================Inputs=========================")
-
     try:
         inputs = request.inputs
         
@@ -236,14 +229,6 @@ async def get_metadata(request: GetMetadataRequest):
     Matches existing Vext API contract
     """
     start_time = time.time()
-    
-
-    print("========================Getting Metadata=========================")
-    print(request)
-    print("========================Received Request=========================")
-
-    print(request.inputs)
-    print("========================Inputs=========================")
 
     try:
         inputs = request.inputs
@@ -358,16 +343,6 @@ async def get_answer(request: GetAnswerRequest):
         elif inputs.url:
             content_text = await content_service.fetch_content(inputs.url)
 
-        print("========================Getting Answer=========================")
-        print(content_text)
-        print("========================Content Text=========================")
-        print(inputs.query)
-        print("========================Query=========================")
-        print(inputs.prompt)
-        print("========================Prompt=========================")
-        print(inputs.lang)
-        print("========================Lang=========================")
-
         # Streaming response
         if request.stream:
             async def stream_answer():
@@ -381,18 +356,6 @@ async def get_answer(request: GetAnswerRequest):
                     
                     # Stream answer from Gemini
                     full_answer = ""
-
-
-                    print("========================Streaming Answer=========================")
-                    print(content_text)
-                    print("========================Content Text=========================")
-                    print(inputs.query)
-                    print("========================Query=========================")
-                    print(inputs.prompt)
-                    print("========================Prompt=========================")
-                    print(inputs.lang)
-                    print("========================Lang=========================")
-
                     async for chunk in gemini_service.stream_answer(
                         content=content_text,
                         question=inputs.query,
@@ -425,10 +388,6 @@ async def get_answer(request: GetAnswerRequest):
                         }
                     })
 
-                    print("========================Final Data=========================")
-                    print(final_data)
-                    print("========================Final Data End=========================")
-
                     yield f"event: workflow_finished\ndata: {final_data}\n\n"
                     
                 except Exception as e:
@@ -440,17 +399,6 @@ async def get_answer(request: GetAnswerRequest):
         
         # Non-streaming response
         else:
-
-
-            print("========================Non-Streaming Answer=========================")
-            print(content_text)
-            print("========================Content Text=========================")
-            print(inputs.query)
-            print("========================Query=========================")
-            print(inputs.prompt)
-            print("========================Prompt=========================")
-            print(inputs.lang)
-            print("========================Lang=========================")
             # Generate cache key
             cache_key = get_cache_key(
                 "answer",
