@@ -75,7 +75,16 @@ class GenerateQuestionsInput(BaseModel):
     context: Optional[str] = None
     prompt: Optional[str] = None
     lang: Optional[str] = "zh-tw"
-    previous_questions: Optional[List[str]] = []
+    previous_questions: Optional[List[str]] = None
+    
+    def __init__(self, **data):
+        # Convert empty string to empty list for previous_questions
+        if 'previous_questions' in data and data['previous_questions'] == '':
+            data['previous_questions'] = []
+        # Convert None to empty list
+        if 'previous_questions' not in data or data['previous_questions'] is None:
+            data['previous_questions'] = []
+        super().__init__(**data)
 
 class GenerateQuestionsRequest(BaseModel):
     inputs: GenerateQuestionsInput
