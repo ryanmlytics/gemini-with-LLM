@@ -17,6 +17,8 @@ from urllib.parse import unquote
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi import status
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from sse_starlette.sse import EventSourceResponse
@@ -125,8 +127,10 @@ async def generate_questions(request: GenerateQuestionsRequest):
     Generate 1-5 structured questions from content or URL
     Matches existing Vext API contract
     """
-
     start_time = time.time()
+    
+    logger.info(f"Received generateQuestions request from user: {request.user}")
+    logger.debug(f"Request data: {request.model_dump()}")
 
     try:
         inputs = request.inputs
@@ -229,6 +233,9 @@ async def get_metadata(request: GetMetadataRequest):
     Matches existing Vext API contract
     """
     start_time = time.time()
+    
+    logger.info(f"Received getMetadata request from user: {request.user}")
+    logger.debug(f"Request data: {request.model_dump()}")
 
     try:
         inputs = request.inputs
@@ -322,6 +329,9 @@ async def get_answer(request: GetAnswerRequest):
     """
     start_time = time.time()
     
+    logger.info(f"Received getAnswer request from user: {request.user}, stream: {request.stream}")
+    logger.debug(f"Request data: {request.model_dump()}")
+
     try:
         inputs = request.inputs
         
@@ -469,6 +479,18 @@ async def get_answer(request: GetAnswerRequest):
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors with detailed messages"""
+    logger.error(f"Validation error on {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "detail": exc.errors(),
+            "message": "Request validation failed. Please check your request format."
+        }
+    )
 
 @app.get("/health")
 async def health_check():
