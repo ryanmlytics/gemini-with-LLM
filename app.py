@@ -14,7 +14,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from urllib.parse import unquote
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -38,11 +38,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Security configuration
+API_BEARER_TOKEN = os.getenv("API_BEARER_TOKEN")
+
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+_parsed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+if _parsed_origins:
+    ALLOWED_ORIGINS = _parsed_origins
+else:
+    ALLOWED_ORIGINS = ["http://localhost", "http://localhost:3000"]
+    logger.warning(
+        "ALLOWED_ORIGINS not set; defaulting CORS policy to localhost origins only. "
+        "Set ALLOWED_ORIGINS env var for production deployments."
+    )
+
+if not API_BEARER_TOKEN:
+    logger.warning(
+        "API_BEARER_TOKEN not set. Authentication checks will be skipped. "
+        "Set this environment variable to enforce bearer-token access."
+    )
+
 # Initialize services
 gemini_service = GeminiService()
 search_service = SearchService()
 cache_service = CacheService()
 content_service = ContentService()
+
+
+async def verify_bearer_token(authorization: str = Header(default=None)) -> None:
+    """
+    Verify bearer token from Authorization header when API_BEARER_TOKEN is configured.
+    """
+    if not API_BEARER_TOKEN:
+        return
+
+    if not authorization or not authorization.startswith("Bearer "):
+        logger.warning("Unauthorized request: missing or malformed Authorization header")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header with Bearer token is required",
+        )
+
+    provided_token = authorization.split(" ", 1)[1].strip()
+    if provided_token != API_BEARER_TOKEN:
+        logger.warning("Forbidden request: invalid bearer token provided")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API token",
+        )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,7 +105,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -130,7 +173,7 @@ def get_cache_key(endpoint: str, inputs: Dict, user: str = "") -> str:
 
 # Endpoints
 
-@app.post("/generateQuestions")
+@app.post("/generateQuestions", dependencies=[Depends(verify_bearer_token)])
 async def generate_questions(request: GenerateQuestionsRequest):
     """
     Generate 1-5 structured questions from content or URL
@@ -236,7 +279,7 @@ async def generate_questions(request: GenerateQuestionsRequest):
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.post("/getMetadata")
+@app.post("/getMetadata", dependencies=[Depends(verify_bearer_token)])
 async def get_metadata(request: GetMetadataRequest):
     """
     Return canonical sources, tags, images and citation hints
@@ -331,7 +374,7 @@ async def get_metadata(request: GetMetadataRequest):
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.post("/getAnswer")
+@app.post("/getAnswer", dependencies=[Depends(verify_bearer_token)])
 async def get_answer(request: GetAnswerRequest):
     """
     Generate grounded, analytical answer with optional SSE streaming

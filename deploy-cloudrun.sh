@@ -26,8 +26,12 @@ gcloud run deploy ${SERVICE_NAME} \
   --timeout 300 \
   --max-instances 10 \
   --min-instances 0 \
-  --set-env-vars "GEMINI_MODEL=gemini-1.5-flash" \
-  --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest"
+  --set-env-vars "GEMINI_MODEL=gemini-2.5-flash-lite" \
+  --set-env-vars "ALLOWED_ORIGINS=https://aigc-mvp.mlytics.co" \
+  --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+  --set-secrets "API_BEARER_TOKEN=API_BEARER_TOKEN:latest" \
+  --set-secrets "GOOGLE_SEARCH_KEY=GOOGLE_SEARCH_KEY:latest" \
+  --set-secrets "GOOGLE_SEARCH_ENGINE_ID=GOOGLE_SEARCH_ENGINE_ID:latest"
 
 echo "Deployment complete!"
 echo "Service URL will be displayed above"

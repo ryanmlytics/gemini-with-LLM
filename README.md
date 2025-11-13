@@ -1,6 +1,8 @@
-# AIGC MVP API Server
+# Agent-Will-Smith API Server
 
 Python FastAPI server that replaces the Vext API with Google Gemini backend. Maintains full compatibility with existing Laravel client code.
+
+**Model**: Gemini 2.5 Flash Lite ($0.1/$0.4 per 1M tokens) - Cost-optimized choice vs Vext ($1/$1)
 
 ## Features
 
@@ -35,8 +37,11 @@ pip install --only-binary :all: lxml
 Create `.env` file:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+# Required in protected environments
+API_BEARER_TOKEN=change_me
+ALLOWED_ORIGINS=https://your-allowed-origin.com
 # Optional
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash-lite  # Cost: $0.1/$0.4 per 1M tokens (input/output)
 REDIS_URL=redis://localhost:6379/0
 ```
 
@@ -57,16 +62,19 @@ curl http://localhost:8888/health
 # Generate questions
 curl -X POST http://localhost:8888/generateQuestions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
   -d '{"inputs": {"url": "https://example.com", "lang": "zh-tw"}, "user": "test_user"}'
 
 # Get metadata
 curl -X POST http://localhost:8888/getMetadata \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
   -d '{"inputs": {"url": "https://example.com"}, "user": "test_user"}'
 
 # Get answer
 curl -X POST http://localhost:8888/getAnswer \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
   -d '{"inputs": {"query": "What is this about?", "url": "https://example.com", "lang": "zh-tw"}, "user": "test_user", "stream": false}'
 ```
 
@@ -77,9 +85,11 @@ Edit `.env` file:
 ```env
 # Required
 GEMINI_API_KEY=your_key_here
+API_BEARER_TOKEN=change_me
+ALLOWED_ORIGINS=https://your-allowed-origin.com
 
 # Optional
-GEMINI_MODEL=gemini-1.5-flash  # gemini-1.5-flash-lite (cheapest) | gemini-1.5-pro (most capable)
+GEMINI_MODEL=gemini-2.5-flash-lite  # Cost: $0.1/$0.4 per 1M tokens (input/output). Alternative: gemini-2.5-flash ($0.3/$2.5)
 REDIS_URL=redis://localhost:6379/0
 HOST=0.0.0.0
 PORT=8888
@@ -90,7 +100,23 @@ GOOGLE_SEARCH_KEY=
 GOOGLE_SEARCH_ENGINE_ID=
 ```
 
+## Security
 
+- **Bearer token authentication**: All POST endpoints require `Authorization: Bearer <token>`. Configure the shared secret via `API_BEARER_TOKEN`. When the variable is unset (local development), authentication is skipped but a warning is logged.
+- **CORS policy**: Control allowed origins with the comma-separated `ALLOWED_ORIGINS` variable. If omitted, only localhost origins are allowed.
+- Store secrets with your deployment platform's secret manager (for example, Cloud Run secrets) and rotate them regularly.
+
+## Go-Live Decisions
+
+**Model Choice**: Gemini 2.5 Flash Lite ($0.1/$0.4 per 1M tokens) - Cost-optimized vs Vext ($1/$1). Databricks AI Gateway kept on roadmap for future A/B testing.
+
+**Authentication**: Bearer token authentication implemented. Firewall setup skipped for Cloud Run (too tedious).
+
+**Scaling**: Cloud Run auto-scaling configured (max 10 instances). Bottleneck expected to be Gemini response latency.
+
+**Observability**: Cloud Run dashboard provides basic metrics and logs. Additional monitoring can be added as needed.
+
+**Testing**: Basic E2E testing planned with AIGC MVP PHP project. Human evaluation for content quality initially; automated evaluation (AI Agents) planned for future.
 
 ## Laravel Integration
 

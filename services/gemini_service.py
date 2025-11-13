@@ -24,7 +24,7 @@ class GeminiService:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
         genai.configure(api_key=api_key)
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
         self.model = genai.GenerativeModel(self.model_name)
         
         # Safety settings
