@@ -8,6 +8,7 @@ Python FastAPI server that replaces the Vext API with Google Gemini backend. Mai
 
 - **Three Core Endpoints**: `POST /generateQuestions`, `POST /getMetadata`, `POST /getAnswer`
 - **Gemini Integration**: Uses Google Gemini for LLM operations
+- **Multi-Language Support**: Generate questions and answers in multiple languages via optional `lang` parameter
 - **Caching**: Multi-tier caching (Redis + file fallback)
 - **Streaming**: Server-Sent Events (SSE) support for answers
 - **API Compatibility**: Maintains exact request/response format from Vext API
@@ -274,6 +275,11 @@ Generate 1-5 questions from content or URL.
 
 **Note:** If both `url` and `context` are provided, `context` takes precedence. Empty string `url: ""` is treated as no URL.
 
+**Language Parameter (`lang`):**
+- Optional parameter (defaults to `"zh-tw"` if not specified)
+- Controls the language of generated questions
+- See [Language Support](#language-support) section for supported language codes
+
 ### POST /getMetadata
 
 Extract metadata (title, summary, tags, images) from URL. **Domain filtering:** Search results are automatically filtered to only include items from the same domain as the input URL.
@@ -356,7 +362,90 @@ Generate answer with optional SSE streaming. Can use `content_id` from `/generat
 
 **Note:** If `content_id` is provided, it retrieves content saved during `/generateQuestions`. Otherwise, it fetches from `url`. Set `"stream": true` for SSE streaming.
 
+**Language Parameter (`lang`):**
+- Optional parameter (defaults to `"zh-tw"` if not specified)
+- Controls the language of generated answers
+- Works for both streaming and non-streaming responses
+- See [Language Support](#language-support) section for supported language codes
 
+## Language Support
+
+The API supports generating questions and answers in multiple languages through the optional `lang` parameter in both `/generateQuestions` and `/getAnswer` endpoints.
+
+### Supported Language Codes
+
+| Code | Language | Native Name |
+|------|----------|-------------|
+| `en` | English | English |
+| `zh-tw` | Traditional Chinese | 繁體中文 (default) |
+| `zh-cn` | Simplified Chinese | 简体中文 |
+| `zh` | Chinese (generic) | 中文 |
+| `es` | Spanish | Español |
+| `fr` | French | Français |
+| `de` | German | Deutsch |
+| `it` | Italian | Italiano |
+| `pt` | Portuguese | Português |
+| `ja` | Japanese | 日本語 |
+| `ko` | Korean | 한국어 |
+| `ru` | Russian | Русский |
+| `ar` | Arabic | العربية |
+| `hi` | Hindi | हिन्दी |
+| `th` | Thai | ไทย |
+| `vi` | Vietnamese | Tiếng Việt |
+| `id` | Indonesian | Bahasa Indonesia |
+| `nl` | Dutch | Nederlands |
+| `pl` | Polish | Polski |
+| `tr` | Turkish | Türkçe |
+
+### Usage Examples
+
+#### Generate Questions in English
+```bash
+curl -X POST http://localhost:8888/generateQuestions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
+  -d '{
+    "inputs": {
+      "url": "https://example.com/article",
+      "lang": "en"
+    },
+    "user": "test_user",
+    "type": "answer_page"
+  }'
+```
+
+#### Generate Questions in Japanese
+```bash
+curl -X POST http://localhost:8888/generateQuestions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
+  -d '{
+    "inputs": {
+      "url": "https://example.com/article",
+      "lang": "ja"
+    },
+    "user": "test_user",
+    "type": "answer_page"
+  }'
+```
+
+#### Get Answer in Spanish
+```bash
+curl -X POST http://localhost:8888/getAnswer \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
+  -d '{
+    "inputs": {
+      "query": "What are the key benefits?",
+      "url": "https://example.com/article",
+      "lang": "es"
+    },
+    "user": "test_user",
+    "stream": false
+  }'
+```
+
+**Note:** If the `lang` parameter is omitted, the API defaults to `"zh-tw"` (Traditional Chinese). The language code is case-insensitive and will be normalized automatically.
 
 ## Caching
 

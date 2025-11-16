@@ -15,6 +15,47 @@ from google.api_core import exceptions as google_exceptions
 logger = logging.getLogger(__name__)
 
 
+def get_language_name(lang_code: str) -> str:
+    """
+    Convert language code to native language name for prompts.
+    Supports common language codes.
+    
+    Args:
+        lang_code: Language code (e.g., 'en', 'zh-tw', 'es', 'fr', etc.)
+        
+    Returns:
+        Native language name for use in prompts
+    """
+    lang_map = {
+        "en": "English",
+        "zh-tw": "繁體中文",
+        "zh-cn": "简体中文",
+        "zh": "中文",
+        "es": "Español",
+        "fr": "Français",
+        "de": "Deutsch",
+        "it": "Italiano",
+        "pt": "Português",
+        "ja": "日本語",
+        "ko": "한국어",
+        "ru": "Русский",
+        "ar": "العربية",
+        "hi": "हिन्दी",
+        "th": "ไทย",
+        "vi": "Tiếng Việt",
+        "id": "Bahasa Indonesia",
+        "nl": "Nederlands",
+        "pl": "Polski",
+        "tr": "Türkçe",
+    }
+    
+    # Normalize language code (lowercase, handle variations)
+    lang_code = lang_code.lower().strip()
+    
+    # Return mapped language or use the code itself if not found
+    return lang_map.get(lang_code, lang_code.upper())
+
+
 class GeminiService:
     """Service for interacting with Google Gemini API"""
     
@@ -61,8 +102,8 @@ class GeminiService:
         """
         previous = previous_questions or []
         
-        # Build prompt
-        lang_prompt = "繁體中文" if lang == "zh-tw" else "English"
+        # Build prompt with language support
+        lang_prompt = get_language_name(lang or "zh-tw")
         
         # Build prompt - use custom prompt if provided, otherwise use default
         if custom_prompt and custom_prompt.strip():
@@ -184,7 +225,7 @@ Return JSON format: {{"questions": [{{"id": "q1", "text": "Question text", "type
         Returns:
             Dict with answer text and metadata
         """
-        lang_prompt = "繁體中文" if lang == "zh-tw" else "English"
+        lang_prompt = get_language_name(lang or "zh-tw")
         
         base_prompt = prompt or f"""Based on the provided content, answer the question comprehensively in {lang_prompt}.
 
@@ -259,7 +300,7 @@ Answer:"""
         Yields:
             String chunks of the answer
         """
-        lang_prompt = "繁體中文" if lang == "zh-tw" else "English"
+        lang_prompt = get_language_name(lang or "zh-tw")
         
         base_prompt = prompt or f"""Based on the provided content, answer the question comprehensively in {lang_prompt}.
 
