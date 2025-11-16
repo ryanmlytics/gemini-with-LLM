@@ -120,6 +120,87 @@
           "path": ["getAnswer"]
         }
       }
+    },
+    {
+      "name": "EEAT Assessment (URL)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"inputs\": {\n    \"input_type\": \"url\",\n    \"url\": \"https://ai.mlyticsaigc.com/\",\n    \"metadata\": {\n      \"author\": \"Ryan Chang\",\n      \"publish_date\": \"2025-01-15\",\n      \"topic_category\": \"general\"\n    }\n  },\n  \"user\": \"{{user}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/eeat",
+          "host": ["{{base_url}}"],
+          "path": ["eeat"]
+        },
+        "description": "Assess E-E-A-T quality of content from a URL. Returns Experience, Expertise, Authoritativeness, and Trust scores with rationale."
+      }
+    },
+    {
+      "name": "EEAT Assessment (Content)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"inputs\": {\n    \"input_type\": \"content\",\n    \"content\": \"This is a comprehensive article about artificial intelligence and its applications in modern business. The author has over 10 years of experience in AI research and development. The content provides detailed technical insights and real-world examples from leading companies.\",\n    \"metadata\": {\n      \"author\": \"Ryan Chang\",\n      \"publish_date\": \"2025-01-15\",\n      \"topic_category\": \"technical\"\n    }\n  },\n  \"user\": \"{{user}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/eeat",
+          "host": ["{{base_url}}"],
+          "path": ["eeat"]
+        },
+        "description": "Assess E-E-A-T quality of direct content text. Returns Experience, Expertise, Authoritativeness, and Trust scores with rationale."
+      }
+    },
+    {
+      "name": "EEAT Assessment (Full Path)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"inputs\": {\n    \"input_type\": \"url\",\n    \"url\": \"https://www.bnext.com.tw/article/85031/nissan-2025-q3-financial-report-reveals-challenges-and-transformation-strategies\",\n    \"metadata\": {\n      \"topic_category\": \"financial\"\n    }\n  },\n  \"user\": \"{{user}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/content/eeat-assessment",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "content", "eeat-assessment"]
+        },
+        "description": "EEAT assessment using the full API path. Example with financial content URL."
+      }
     }
   ],
   "variable": [

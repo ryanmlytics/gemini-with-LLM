@@ -6,8 +6,9 @@ Python FastAPI server that replaces the Vext API with Google Gemini backend. Mai
 
 ## Features
 
-- **Three Core Endpoints**: `POST /generateQuestions`, `POST /getMetadata`, `POST /getAnswer`
+- **Four Core Endpoints**: `POST /generateQuestions`, `POST /getMetadata`, `POST /getAnswer`, `POST /eeat`
 - **Gemini Integration**: Uses Google Gemini for LLM operations
+- **E-E-A-T Assessment**: Analyze content quality (Experience, Expertise, Authoritativeness, Trust) based on Google's Search Quality Rater Guidelines
 - **Multi-Language Support**: Generate questions and answers in multiple languages via optional `lang` parameter
 - **Caching**: Multi-tier caching (Redis + file fallback)
 - **Streaming**: Server-Sent Events (SSE) support for answers
@@ -140,6 +141,44 @@ curl -X POST http://localhost:8888/getAnswer \
     },
     "user": "test_user",
     "stream": false
+  }'
+```
+
+#### EEAT Assessment (with URL)
+```bash
+curl -X POST http://localhost:8888/eeat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
+  -d '{
+    "inputs": {
+      "input_type": "url",
+      "url": "https://www.bnext.com.tw/article/85031/nissan-2025-q3-financial-report-reveals-challenges-and-transformation-strategies",
+      "metadata": {
+        "author": "John Doe",
+        "publish_date": "2025-01-15",
+        "topic_category": "financial"
+      }
+    },
+    "user": "test_user"
+  }'
+```
+
+#### EEAT Assessment (with Content)
+```bash
+curl -X POST http://localhost:8888/eeat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer change_me" \
+  -d '{
+    "inputs": {
+      "input_type": "content",
+      "content": "This is a comprehensive article about artificial intelligence and its applications in modern business. The author has over 10 years of experience in AI research and development.",
+      "metadata": {
+        "author": "Dr. Jane Smith",
+        "publish_date": "2025-01-15",
+        "topic_category": "technical"
+      }
+    },
+    "user": "test_user"
   }'
 ```
 
@@ -367,6 +406,114 @@ Generate answer with optional SSE streaming. Can use `content_id` from `/generat
 - Controls the language of generated answers
 - Works for both streaming and non-streaming responses
 - See [Language Support](#language-support) section for supported language codes
+
+### POST /eeat (or /api/v1/content/eeat-assessment)
+
+Assess E-E-A-T (Experience, Expertise, Authoritativeness, Trust) quality of content based on Google's Search Quality Rater Guidelines.
+
+**Request:**
+```json
+{
+  "inputs": {
+    "input_type": "url",
+    "url": "https://example.com/article",
+    "content": "Optional: direct content text (if input_type is 'content')",
+    "metadata": {
+      "author": "Optional: author name",
+      "publish_date": "Optional: YYYY-MM-DD format",
+      "topic_category": "Optional: medical|financial|general"
+    }
+  },
+  "user": "test_user"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "overall_level": "High E-E-A-T",
+    "scores": {
+      "experience": {
+        "level": "High",
+        "confidence": 0.85,
+        "rationale": [
+          "Author demonstrates first-hand usage of the product reviewed",
+          "Includes personal anecdotes and specific details from direct interaction",
+          "Photos and videos suggest authentic personal experience"
+        ]
+      },
+      "expertise": {
+        "level": "High",
+        "confidence": 0.78,
+        "rationale": [
+          "Author holds relevant credentials in the field",
+          "Content demonstrates deep technical knowledge",
+          "Explanations show nuanced understanding of complex topics"
+        ]
+      },
+      "authoritativeness": {
+        "level": "High",
+        "confidence": 0.92,
+        "rationale": [
+          "Published on recognized authoritative website in this domain",
+          "Author cited by other reputable sources in the field",
+          "Content referenced in academic or professional contexts"
+        ]
+      },
+      "trust": {
+        "level": "Trustworthy",
+        "confidence": 0.88,
+        "rationale": [
+          "No evidence of inaccurate or misleading information",
+          "Clear disclosure of affiliations and potential conflicts",
+          "Contact information and customer service details readily available"
+        ]
+      }
+    },
+    "page_quality_rating": "High",
+    "is_ymyl": true,
+    "evidence_summary": {
+      "on_page": [
+        "Clear author bio with credentials",
+        "Transparent about content purpose",
+        "Well-structured and informative main content"
+      ],
+      "external": [
+        "Positive reviews from independent sources found",
+        "Author has established professional presence",
+        "No significant controversies or trust issues detected"
+      ]
+    },
+    "recommendations": [
+      "Consider adding more specific examples from personal experience",
+      "Include citations to support key factual claims",
+      "Add more detailed author credentials visible on page"
+    ]
+  },
+  "metadata": {
+    "analyzed_at": "2025-11-15T10:30:00Z",
+    "processing_time_ms": 2340,
+    "content_length": 2500,
+    "language": "en"
+  }
+}
+```
+
+**E-E-A-T Level Definitions:**
+- **Experience**: `High` | `Adequate` | `Lacking` | `N/A`
+- **Expertise**: `High` | `Adequate` | `Lacking` | `N/A`
+- **Authoritativeness**: `Very High` | `High` | `Adequate` | `Lacking` | `N/A`
+- **Trust**: `Trustworthy` | `Adequate` | `Untrustworthy`
+- **Page Quality**: `Highest` | `High` | `Medium` | `Low` | `Lowest`
+
+**Notes:**
+- Use `input_type: "url"` to analyze content from a URL, or `input_type: "content"` for direct text
+- If Trust is `Untrustworthy`, overall rating is automatically set to `Lowest`
+- Metadata is optional but helps improve assessment accuracy
+- Results are cached for 1 hour
+- Both `/eeat` and `/api/v1/content/eeat-assessment` endpoints are available
 
 ## Language Support
 

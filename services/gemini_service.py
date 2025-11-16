@@ -421,4 +421,196 @@ Tags:"""
         except Exception as e:
             logger.error(f"Error generating tags: {str(e)}", exc_info=True)
             return []
+    
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def assess_eeat(
+        self,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        lang: str = "en"
+    ) -> Dict[str, Any]:
+        """
+        Assess E-E-A-T (Experience, Expertise, Authoritativeness, Trust) quality of content
+        
+        Args:
+            content: Content text to assess
+            metadata: Optional metadata (author, publish_date, topic_category)
+            lang: Language code for response
+            
+        Returns:
+            Dict with E-E-A-T scores and rationale
+        """
+        lang_prompt = get_language_name(lang or "en")
+        
+        # Build metadata context
+        metadata_context = ""
+        if metadata:
+            if metadata.get("author"):
+                metadata_context += f"Author: {metadata['author']}\n"
+            if metadata.get("publish_date"):
+                metadata_context += f"Publish Date: {metadata['publish_date']}\n"
+            if metadata.get("topic_category"):
+                metadata_context += f"Topic Category: {metadata['topic_category']}\n"
+        
+        prompt = f"""You are an expert content quality assessor following Google's Search Quality Rater Guidelines. 
+Analyze the following content and assess its E-E-A-T (Experience, Expertise, Authoritativeness, Trust) quality.
+
+Content to analyze:
+{content[:15000]}
+
+{metadata_context if metadata_context else ''}
+
+Assessment Requirements:
+1. Evaluate each E-E-A-T component independently
+2. For Experience: Assess if content shows first-hand or life experience relevant to the topic
+3. For Expertise: Assess if content demonstrates necessary knowledge or skill for the topic
+4. For Authoritativeness: Assess if the source is recognized as authoritative in the field
+5. For Trust: Assess if content is accurate, transparent, and safe (THIS IS CRITICAL - if trust fails, overall rating must be Lowest)
+
+Level Definitions:
+- Experience: High | Adequate | Lacking | N/A
+- Expertise: High | Adequate | Lacking | N/A
+- Authoritativeness: Very High | High | Adequate | Lacking | N/A
+- Trust: Trustworthy | Adequate | Untrustworthy
+
+Overall Page Quality: Highest | High | Medium | Low | Lowest
+
+YMYL (Your Money or Your Life) Check: true | false
+
+Return your assessment in JSON format with this exact structure:
+{{
+  "overall_level": "High E-E-A-T",
+  "scores": {{
+    "experience": {{
+      "level": "High|Adequate|Lacking|N/A",
+      "confidence": 0.0-1.0,
+      "rationale": ["bullet point 1", "bullet point 2", "bullet point 3"]
+    }},
+    "expertise": {{
+      "level": "High|Adequate|Lacking|N/A",
+      "confidence": 0.0-1.0,
+      "rationale": ["bullet point 1", "bullet point 2", "bullet point 3"]
+    }},
+    "authoritativeness": {{
+      "level": "Very High|High|Adequate|Lacking|N/A",
+      "confidence": 0.0-1.0,
+      "rationale": ["bullet point 1", "bullet point 2", "bullet point 3"]
+    }},
+    "trust": {{
+      "level": "Trustworthy|Adequate|Untrustworthy",
+      "confidence": 0.0-1.0,
+      "rationale": ["bullet point 1", "bullet point 2", "bullet point 3"]
+    }}
+  }},
+  "page_quality_rating": "Highest|High|Medium|Low|Lowest",
+  "is_ymyl": true|false,
+  "evidence_summary": {{
+    "on_page": ["evidence 1", "evidence 2"],
+    "external": ["evidence 1", "evidence 2"]
+  }},
+  "recommendations": ["recommendation 1", "recommendation 2"]
+}}
+
+IMPORTANT: 
+- If trust level is "Untrustworthy", overall_level must be "Lowest E-E-A-T" and page_quality_rating must be "Lowest"
+- Provide 3-5 bullet points for each rationale
+- Confidence scores should reflect how certain you are about the assessment
+- Be specific and evidence-based in your rationale
+
+Respond in {lang_prompt} for rationale and recommendations, but keep level values in English as specified above."""
+        
+        try:
+            # Run synchronous Gemini API call in thread pool
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.model.generate_content(
+                    prompt,
+                    safety_settings=self.safety_settings,
+                    generation_config={
+                        "max_output_tokens": 2000,
+                        "temperature": 0.3,  # Lower temperature for more consistent assessments
+                    }
+                )
+            )
+            
+            result_text = response.text
+            
+            # Parse JSON from response
+            import json
+            import re
+            
+            # Find JSON in response
+            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+            if json_match:
+                result_data = json.loads(json_match.group())
+            else:
+                # Fallback: try to parse the entire response
+                try:
+                    result_data = json.loads(result_text)
+                except:
+                    logger.error(f"Failed to parse EEAT assessment JSON: {result_text[:500]}")
+                    raise ValueError("Failed to parse EEAT assessment response")
+            
+            # Validate and normalize the response structure
+            return self._normalize_eeat_response(result_data)
+            
+        except google_exceptions.FailedPrecondition as e:
+            error_msg = str(e)
+            if "location is not supported" in error_msg.lower():
+                logger.warning("Gemini API not available in this region. Location restriction detected.")
+                raise ValueError("Gemini API is not available in your region. Please use VPN or deploy to a supported region (USA/Europe).")
+            raise
+        except (google_exceptions.ServiceUnavailable, google_exceptions.RetryError) as e:
+            error_msg = str(e)
+            if "timeout" in error_msg.lower() or "connection timed out" in error_msg.lower() or "failed to connect" in error_msg.lower():
+                logger.error(f"Connection timeout to Gemini API: {error_msg}")
+                raise ValueError("Cannot connect to Gemini API. Please check your network connection, firewall settings, or use VPN if Google services are blocked in your region.")
+            raise
+        except Exception as e:
+            logger.error(f"Error assessing EEAT: {str(e)}", exc_info=True)
+            raise
+    
+    def _normalize_eeat_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize and validate EEAT assessment response
+        
+        Args:
+            data: Raw response data from LLM
+            
+        Returns:
+            Normalized response structure
+        """
+        # Ensure all required fields exist with defaults
+        normalized = {
+            "overall_level": data.get("overall_level", "Medium E-E-A-T"),
+            "scores": {},
+            "page_quality_rating": data.get("page_quality_rating", "Medium"),
+            "is_ymyl": data.get("is_ymyl", False),
+            "evidence_summary": {
+                "on_page": data.get("evidence_summary", {}).get("on_page", []),
+                "external": data.get("evidence_summary", {}).get("external", [])
+            },
+            "recommendations": data.get("recommendations", [])
+        }
+        
+        # Normalize each E-E-A-T component
+        scores = data.get("scores", {})
+        for component in ["experience", "expertise", "authoritativeness", "trust"]:
+            component_data = scores.get(component, {})
+            normalized["scores"][component] = {
+                "level": component_data.get("level", "N/A"),
+                "confidence": float(component_data.get("confidence", 0.5)),
+                "rationale": component_data.get("rationale", [])
+            }
+        
+        # Enforce trust gating: if trust is Untrustworthy, set overall to Lowest
+        if normalized["scores"]["trust"]["level"] == "Untrustworthy":
+            normalized["overall_level"] = "Lowest E-E-A-T"
+            normalized["page_quality_rating"] = "Lowest"
+        
+        return normalized
 

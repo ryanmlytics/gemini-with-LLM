@@ -157,6 +157,16 @@ class GetAnswerRequest(BaseModel):
     user: str = "uuid_user"
     stream: Optional[bool] = False
 
+class EEATAssessmentInput(BaseModel):
+    input_type: str  # "url" or "content"
+    url: Optional[str] = None
+    content: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class EEATAssessmentRequest(BaseModel):
+    inputs: EEATAssessmentInput
+    user: Optional[str] = "uuid_user"
+
 # Helper functions
 
 def generate_uuid(key: str) -> str:
@@ -620,6 +630,169 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "message": "Request validation failed. Please check your request format."
         }
     )
+
+@app.post("/api/v1/content/eeat-assessment", dependencies=[Depends(verify_bearer_token)])
+@app.post("/eeat", dependencies=[Depends(verify_bearer_token)])
+async def eeat_assessment(request: EEATAssessmentRequest):
+    """
+    Assess E-E-A-T (Experience, Expertise, Authoritativeness, Trust) quality of content
+    """
+    start_time = time.time()
+    
+    logger.info(f"Received EEAT assessment request from user: {request.user}")
+    logger.debug(f"Request data: {request.model_dump()}")
+    
+    try:
+        inputs = request.inputs
+        
+        # Validate input_type
+        if inputs.input_type not in ["url", "content"]:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "input_type must be either 'url' or 'content'",
+                        "details": {}
+                    }
+                }
+            )
+        
+        # Validate that required field is provided
+        if inputs.input_type == "url" and not inputs.url:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "url is required when input_type is 'url'",
+                        "details": {}
+                    }
+                }
+            )
+        if inputs.input_type == "content" and not inputs.content:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "content is required when input_type is 'content'",
+                        "details": {}
+                    }
+                }
+            )
+        
+        # Decode URL-encoded URLs
+        content_text = ""
+        if inputs.input_type == "url":
+            if inputs.url:
+                inputs.url = unquote(inputs.url)
+                content_text = await content_service.fetch_content(inputs.url)
+                if not content_text:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "status": "error",
+                            "error": {
+                                "code": "CONTENT_FETCH_FAILED",
+                                "message": "Unable to fetch content from the provided URL",
+                                "details": {
+                                    "url": inputs.url,
+                                    "reason": "Content extraction failed or URL returned empty content"
+                                }
+                            }
+                        }
+                    )
+        else:
+            if inputs.content:
+                content_text = inputs.content
+        
+        if not content_text:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "No content available for assessment",
+                        "details": {}
+                    }
+                }
+            )
+        
+        # Generate cache key
+        cache_key = get_cache_key(
+            "eeat_assessment",
+            {
+                "input_type": inputs.input_type,
+                "url": inputs.url or "",
+                "content_hash": hashlib.sha256(content_text.encode()).hexdigest()[:16],
+                "metadata": json.dumps(inputs.metadata or {}, sort_keys=True)
+            },
+            request.user or ""
+        )
+        
+        # Check cache
+        cached_result = await cache_service.get(cache_key)
+        if cached_result:
+            logger.info(f"Cache hit for EEAT assessment: {cache_key[:20]}...")
+            return JSONResponse(content=cached_result)
+        
+        # Perform EEAT assessment
+        assessment_result = await gemini_service.assess_eeat(
+            content=content_text,
+            metadata=inputs.metadata,
+            lang="en"  # Can be made configurable if needed
+        )
+        
+        # Calculate processing time
+        processing_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Build response matching spec format
+        response = {
+            "status": "success",
+            "data": assessment_result,
+            "metadata": {
+                "analyzed_at": datetime.utcnow().isoformat() + "Z",
+                "processing_time_ms": processing_time_ms,
+                "content_length": len(content_text),
+                "language": "en"  # Can detect language if needed
+            }
+        }
+        
+        # Cache result (1 hour)
+        await cache_service.set(cache_key, response, ttl=3600)
+        
+        return JSONResponse(content=response)
+        
+    except HTTPException:
+        # Re-raise HTTPException (don't convert to 500)
+        raise
+    except ValueError as e:
+        # Location restriction, connection timeout, or configuration error
+        error_msg = str(e)
+        if "location is not supported" in error_msg.lower() or "region" in error_msg.lower():
+            logger.error(f"Gemini API location restriction: {error_msg}")
+            raise HTTPException(
+                status_code=503,
+                detail="Gemini API is not available in this region. Please use VPN or deploy to a supported region."
+            )
+        elif "cannot connect" in error_msg.lower() or "connection" in error_msg.lower():
+            logger.error(f"Gemini API connection error: {error_msg}")
+            raise HTTPException(
+                status_code=503,
+                detail="Cannot connect to Gemini API. Please check your network connection, firewall settings, or use VPN if Google services are blocked in your region."
+            )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error performing EEAT assessment: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @app.get("/health")
 async def health_check():
